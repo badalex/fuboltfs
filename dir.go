@@ -50,6 +50,16 @@ func (d Dir) Lookup(name string, intr fs.Intr) (fs.Node, fuse.Error) {
 	return r, nil
 }
 
+func (d Dir) Rename(req *fuse.RenameRequest, intr fs.Intr) (fs.Node, fuse.Error) {
+	log.Println(d.inode, req)
+	return nil, fuse.Errno(syscall.EEXIST)
+}
+
+func (d Dir) Remove(req *fuse.RemoveRequest, intr fs.Intr) (fs.Node, fuse.Error) {
+	log.Println(d.inode, req)
+	return nil, fuse.Errno(syscall.EEXIST)
+}
+
 func (d Dir) Mkdir(req *fuse.MkdirRequest, intr fs.Intr) (fs.Node, fuse.Error) {
 	var child fs.Node
 	err := d.fs.db.Update(func(tx *bolt.Tx) error {

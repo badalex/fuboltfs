@@ -1,0 +1,10 @@
+package main;
+
+
+message WFile {
+	required uint64 inode = 1;
+	required uint64 size = 2;
+	required fixed64 hash = 3;
+	required string name = 4;
+}
+

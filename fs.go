@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"errors"
 	"sync"
-	"log"
 )
 
 const root_inode uint64 = 1
@@ -83,7 +82,6 @@ func (fs *FS) NewInode(tx *bolt.Tx) (uint64, error) {
 		r = min_inode
 	}
 	r++
-	log.Println("inode('", r, "')")
 	b.Put([]byte("lastinode"), uint64_b(r))
 	return r, nil
 }

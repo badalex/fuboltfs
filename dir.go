@@ -7,7 +7,6 @@ import (
 	"errors"
 	"syscall"
 	"github.com/boltdb/bolt"
-	"log"
 )
 
 type Dir struct {
@@ -50,14 +49,74 @@ func (d Dir) Lookup(name string, intr fs.Intr) (fs.Node, fuse.Error) {
 	return r, nil
 }
 
-func (d Dir) Rename(req *fuse.RenameRequest, intr fs.Intr) (fs.Node, fuse.Error) {
-	log.Println(d.inode, req)
-	return nil, fuse.Errno(syscall.EEXIST)
+func (d Dir) Rename(req *fuse.RenameRequest, newDir fs.Node, intr fs.Intr) fuse.Error {
+
+	if req.NewName == req.OldName && newDir.Attr().Inode == d.inode {
+		// seems to be a noop
+		return nil
+	}
+
+	return d.fs.db.Update(func(tx *bolt.Tx) error {
+		kids := tx.Bucket([]byte("kids"))
+		if kids == nil {
+			return errors.New("Missing kids bucket")
+		}
+		dkids := kids.Bucket(uint64_b(d.inode))
+		if dkids == nil {
+			return errors.New("Missing directory kids bucket")
+		}
+		key := []byte(req.OldName)
+		exists := dkids.Get(key)
+		if exists == nil {
+			return fuse.Errno(syscall.ENOENT)
+		}
+
+		// put it into the new folder before we remove it from the old one
+		new_dir_inode := newDir.Attr().Inode
+
+		var ndkids *bolt.Bucket
+		if new_dir_inode == d.inode {
+			ndkids = dkids
+		} else {
+			ndkids = kids.Bucket(uint64_b(new_dir_inode))
+			if ndkids == nil {
+				return errors.New("Missing new directory kids bucket")
+			}
+		}
+
+		newkey := []byte(req.NewName)
+
+		err := ndkids.Put(newkey, exists)
+		if err != nil {
+			return err
+		}
+
+		err = dkids.Delete(key)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
 }
 
-func (d Dir) Remove(req *fuse.RemoveRequest, intr fs.Intr) (fs.Node, fuse.Error) {
-	log.Println(d.inode, req)
-	return nil, fuse.Errno(syscall.EEXIST)
+func (d Dir) Remove(req *fuse.RemoveRequest, intr fs.Intr) fuse.Error {
+	return d.fs.db.Update(func(tx *bolt.Tx) error {
+		kids := tx.Bucket([]byte("kids"))
+		if kids == nil {
+			return errors.New("Missing kids bucket")
+		}
+		dkids := kids.Bucket(uint64_b(d.inode))
+		if dkids == nil {
+			return errors.New("Missing directory kids bucket")
+		}
+		key := []byte(req.Name)
+		exists := dkids.Get(key)
+		if exists == nil {
+			return fuse.Errno(syscall.ENOENT)
+		}
+		return dkids.Delete(key)
+	})
 }
 
 func (d Dir) Mkdir(req *fuse.MkdirRequest, intr fs.Intr) (fs.Node, fuse.Error) {
@@ -71,7 +130,6 @@ func (d Dir) Mkdir(req *fuse.MkdirRequest, intr fs.Intr) (fs.Node, fuse.Error) {
 		if dkids == nil {
 			return errors.New("Missing directory kids bucket")
 		}
-		log.Println("mkdir('", req.Name, "')")
 		key := []byte(req.Name)
 		exists := dkids.Get(key)
 		if exists != nil {

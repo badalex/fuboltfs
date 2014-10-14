@@ -43,7 +43,7 @@ func main() {
 	}
 	defer myfs.CloseBolt()
 
-	log.Println("fs ready")
+	log.Println("fs ready 2")
 	fs.Serve(c, myfs)
 
 	<-c.Ready

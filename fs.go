@@ -42,6 +42,9 @@ func newfs(stoarage string) (*FS, error) {
 		if _, err := tx.CreateBucketIfNotExists([]byte("misc")); err != nil {
 			return err
 		}
+		if _, err := tx.CreateBucketIfNotExists([]byte("filesize")); err != nil {
+			return err
+		}
 		cb, err := tx.CreateBucketIfNotExists([]byte("kids"))
 		if err != nil {
 			return err

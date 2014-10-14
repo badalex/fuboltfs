@@ -17,6 +17,10 @@ var Usage = func() {
 	flag.PrintDefaults()
 }
 
+func dbg(msg interface{}) {
+	log.Println(msg)
+}
+
 func main() {
 	flag.Usage = Usage
 	flag.Parse()
@@ -43,8 +47,13 @@ func main() {
 	}
 	defer myfs.CloseBolt()
 
-	log.Println("fs ready 2")
-	fs.Serve(c, myfs)
+	log.Println("fs ready")
+
+	server := fs.Server{
+		FS: myfs,
+//		Debug: dbg,
+	}
+	server.Serve(c)
 
 	<-c.Ready
 	if err := c.MountError; err != nil {

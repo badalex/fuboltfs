@@ -23,6 +23,10 @@ func (d Dir) Lookup(name string, intr fs.Intr) (fs.Node, fuse.Error) {
 	var r fs.Node
 
 	err := d.fs.db.View(func(tx *bolt.Tx) error {
+		fsizes := tx.Bucket([]byte("filesize"))
+		if fsizes == nil {
+			return errors.New("Missing filesize bucket")
+		}
 		kids := tx.Bucket([]byte("kids"))
 		if kids == nil {
 			return errors.New("Missing kids bucket")
@@ -39,7 +43,12 @@ func (d Dir) Lookup(name string, intr fs.Intr) (fs.Node, fuse.Error) {
 		if inode == 0 {
 			return fuse.ENOENT
 		}
-		r = Dir{inode: inode, fs: d.fs}
+		fsizev := fsizes.Get(match)
+		if fsizev == nil {
+			r = Dir{inode: inode, fs: d.fs}
+		} else {
+			r = File{inode: inode, fs: d.fs, fsize: b_uint64(fsizev)}
+		}
 		return nil
 	})
 	if err != nil {
@@ -159,6 +168,10 @@ func (d Dir) ReadDir(intr fs.Intr) ([]fuse.Dirent, fuse.Error) {
 	list := []fuse.Dirent{}
 
 	err := d.fs.db.View(func(tx *bolt.Tx) error {
+		fsizes := tx.Bucket([]byte("filesize"))
+		if fsizes == nil {
+			return errors.New("Missing filesize bucket")
+		}
 		kids := tx.Bucket([]byte("kids"))
 		if kids == nil {
 			return errors.New("Missing kids bucket")
@@ -171,10 +184,16 @@ func (d Dir) ReadDir(intr fs.Intr) ([]fuse.Dirent, fuse.Error) {
 			name := string(k)
 			inode := b_uint64(v)
 
+			fsize := fsizes.Get(v)
+			typ := fuse.DT_Dir
+			if fsize != nil {
+				typ = fuse.DT_File
+			}
+
 			list = append(list, fuse.Dirent{
 				Inode: inode,
 				Name: name,
-				Type: fuse.DT_Dir,
+				Type: typ,
 			})
 			return nil
 		})
@@ -187,3 +206,50 @@ func (d Dir) ReadDir(intr fs.Intr) ([]fuse.Dirent, fuse.Error) {
 	return list, nil
 }
 
+
+func (d Dir) Create(req *fuse.CreateRequest, resp *fuse.CreateResponse, intr fs.Intr) (fs.Node, fs.Handle, fuse.Error) {
+	var child fs.Node
+	var handle fs.Handle
+	err := d.fs.db.Update(func(tx *bolt.Tx) error {
+		fsizes := tx.Bucket([]byte("filesize"))
+		if fsizes == nil {
+			return errors.New("Missing filesize bucket")
+		}
+		kids := tx.Bucket([]byte("kids"))
+		if kids == nil {
+			return errors.New("Missing kids bucket")
+		}
+		dkids := kids.Bucket(uint64_b(d.inode))
+		if dkids == nil {
+			return errors.New("Missing directory kids bucket")
+		}
+		key := []byte(req.Name)
+		exists := dkids.Get(key)
+		if exists != nil {
+			return fuse.Errno(syscall.EEXIST)
+		}
+
+		inode, err := d.fs.NewInode(tx)
+		if err != nil {
+			return err
+		}
+
+		val := uint64_b(inode)
+		dkids.Put(key, val)
+		fsizes.Put(val, uint64_b(0))
+
+		newfile := File{inode: inode, fs: d.fs, fsize: 0}
+		child = &newfile
+
+		handle, err = NewHandle(&newfile, syscall.O_CREAT | syscall.O_EXCL)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	if err != nil {
+		return nil, nil, err
+	}
+	return child, handle, err
+}

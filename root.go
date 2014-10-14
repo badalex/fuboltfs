@@ -5,7 +5,6 @@ import (
 	"bazil.org/fuse/fs"
 )
 
-func (fs *FS) Root() (fs.Node, fuse.Error) {
-	return Dir{inode: root_inode, fs: fs}, nil
+func (myfs *FS) Root() (fs.Node, fuse.Error) {
+	return Dir{inode: root_inode, fs: myfs}, nil
 }
-

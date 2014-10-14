@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/user"
 
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
@@ -31,7 +32,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	myfs, err := newfs("/home/joel/fstorage")
+	you, err := user.Current()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	myfs, err := newfs(you.HomeDir + "/fstorage")
 	if err != nil {
 		log.Fatal(err)
 	}

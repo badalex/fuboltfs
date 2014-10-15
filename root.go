@@ -6,5 +6,6 @@ import (
 )
 
 func (myfs *FS) Root() (fs.Node, fuse.Error) {
-	return Dir{inode: root_inode, fs: myfs}, nil
+	r := Dir{inode: root_inode, fs: myfs}
+	return r, nil
 }

@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/user"
+//	"runtime"
 
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
@@ -22,6 +23,8 @@ func dbg(msg interface{}) {
 }
 
 func main() {
+	//runtime.GOMAXPROCS(runtime.NumCPU())
+
 	flag.Usage = Usage
 	flag.Parse()
 

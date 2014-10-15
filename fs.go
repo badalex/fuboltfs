@@ -9,7 +9,7 @@ import (
 )
 
 const root_inode uint64 = 1
-const min_inode uint64 = 1024
+const min_inode uint64 = 10
 
 func uint64_b(i uint64) []byte {
 	var buf bytes.Buffer
@@ -30,6 +30,7 @@ type FS struct {
 	storagepath string
 	db	*bolt.DB
 	seqmu sync.RWMutex
+	generation uint64
 }
 
 func newfs(stoarage string) (*FS, error) {
@@ -89,3 +90,15 @@ func (fs *FS) NewInode(tx *bolt.Tx) (uint64, error) {
 	return r, nil
 }
 
+func (fs *FS) Generation() uint64 {
+	fs.seqmu.RLock()
+	defer fs.seqmu.RUnlock()
+	return fs.generation
+}
+
+func (fs *FS) NewGeneration() uint64 {
+	fs.seqmu.Lock()
+	defer fs.seqmu.Unlock()
+	fs.generation++
+	return fs.generation
+}

@@ -56,6 +56,7 @@ func (f File) LoadSize() uint64 {
 
 func (f File) Open(req *fuse.OpenRequest, resp *fuse.OpenResponse, intr fs.Intr) (fs.Handle, fuse.Error) {
 	log.Println(f.inode, "open")
+	resp.Flags &^= fuse.OpenDirectIO
 	return NewHandle(&f, req.Flags)
 }
 

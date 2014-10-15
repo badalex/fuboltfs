@@ -10,7 +10,11 @@ import (
 
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
+
+	"runtime/pprof"
 )
+
+const useProfile = true
 
 var Usage = func() {
 	fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
@@ -31,6 +35,15 @@ func exists(path string) bool {
 }
 
 func main() {
+	if (useProfile) {
+		f, err := os.Create("profile.prof")
+		if err != nil {
+			panic(err)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
+
 	//runtime.GOMAXPROCS(runtime.NumCPU())
 
 	flag.Usage = Usage

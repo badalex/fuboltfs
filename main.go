@@ -22,6 +22,14 @@ func dbg(msg interface{}) {
 	log.Println(msg)
 }
 
+func exists(path string) bool {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true
+	}
+	return false
+}
+
 func main() {
 	//runtime.GOMAXPROCS(runtime.NumCPU())
 
@@ -42,6 +50,19 @@ func main() {
 	you, err := user.Current()
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if !exists(you.HomeDir + "/fstorage") {
+		err := os.Mkdir(you.HomeDir + "/fstorage", 0700)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	if !exists(you.HomeDir + "/fstorage/files") {
+		err := os.Mkdir(you.HomeDir + "/fstorage/files", 0700)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	myfs, err := newfs(you.HomeDir + "/fstorage")

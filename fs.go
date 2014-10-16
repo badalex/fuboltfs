@@ -6,7 +6,13 @@ import (
 	"bytes"
 	"errors"
 	"sync"
+	"log"
+	"syscall"
+	"bazil.org/fuse"
+	"bazil.org/fuse/fs"
 )
+
+var _ = log.Println
 
 const root_inode uint64 = 1
 const min_inode uint64 = 10
@@ -44,6 +50,9 @@ func newfs(stoarage string) (*FS, error) {
 			return err
 		}
 		if _, err := tx.CreateBucketIfNotExists([]byte("filesize")); err != nil {
+			return err
+		}
+		if _, err := tx.CreateBucketIfNotExists([]byte("xattrs")); err != nil {
 			return err
 		}
 		cb, err := tx.CreateBucketIfNotExists([]byte("kids"))
@@ -101,4 +110,25 @@ func (fs *FS) NewGeneration() uint64 {
 	defer fs.seqmu.Unlock()
 	fs.generation++
 	return fs.generation
+}
+
+func (fs *FS) Statfs(req *fuse.StatfsRequest, resp *fuse.StatfsResponse, intr fs.Intr) fuse.Error {
+	// statfs our storage directory
+	stat := syscall.Statfs_t{}
+	err := syscall.Statfs(fs.storagepath, &stat)
+	if err != nil {
+		return err
+	}
+
+	resp.Blocks = stat.Blocks
+	resp.Bfree = stat.Bfree
+	resp.Bavail = stat.Bavail
+	resp.Files = stat.Files
+	resp.Ffree = stat.Ffree
+	resp.Bsize = uint32(stat.Bsize)
+	resp.Namelen = 4096
+	resp.Frsize = 4096
+	// maybe on linux we pass it through?
+	//uint32(stat.Frsize)
+	return nil
 }

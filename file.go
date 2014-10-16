@@ -6,6 +6,8 @@ import (
 	"github.com/boltdb/bolt"
 	"errors"
 	"log"
+	"strconv"
+	"syscall"
 )
 
 var _ = log.Println
@@ -17,10 +19,21 @@ type File struct {
 
 func (f File) Attr() fuse.Attr {
 	log.Println(f.inode, "fattr")
+
+	fpath := f.fs.storagepath + "/files/" + strconv.FormatUint(f.inode, 10)
+
+	var s uint64
+
+	stat := syscall.Stat_t{}
+	err := syscall.Stat(fpath, &stat)
+	if err == nil {
+		s = uint64(stat.Size)
+	}
+
 	return fuse.Attr{
 		Inode: f.inode,
 		Mode: 0644,
-		Size: f.LoadSize(),
+		Size: s, //f.LoadSize(),
 		Nlink: 1,
 	}
 }
@@ -34,6 +47,74 @@ func (f File) Fsync(req *fuse.FsyncRequest, intr fs.Intr) fuse.Error {
 	//
 	// Well at least flush works.  Hopefully that's not scary. :D
 	return nil
+}
+
+
+func (f File) Listxattr(req *fuse.ListxattrRequest, resp *fuse.ListxattrResponse, intr fs.Intr) fuse.Error {
+	return f.fs.db.View(func(tx *bolt.Tx) error {
+		xtb := tx.Bucket([]byte("xattrs"))
+		if xtb == nil {
+			return errors.New("Missing xattrs bucket")
+		}
+		key := uint64_b(f.inode)
+		xb := xtb.Bucket(key)
+		if xb == nil {
+			// no xattrs for this file
+			return nil
+		}
+		xb.ForEach(func(k, v []byte) error {
+			resp.Append(string(k))
+			return nil
+		})
+		return nil
+	})
+}
+
+func (f File) Getxattr(req *fuse.GetxattrRequest, resp *fuse.GetxattrResponse, intr fs.Intr) fuse.Error {
+	return f.fs.db.View(func(tx *bolt.Tx) error {
+		xtb := tx.Bucket([]byte("xattrs"))
+		if xtb == nil {
+			return errors.New("Missing xattrs bucket")
+		}
+		key := uint64_b(f.inode)
+		xb := xtb.Bucket(key)
+		if xb == nil {
+			// no xattrs for this file
+			return nil
+		}
+		resp.Xattr = xb.Get([]byte(req.Name))
+		return nil
+	})
+}
+
+func (f File) Setxattr(req *fuse.SetxattrRequest, intr fs.Intr) fuse.Error {
+	return f.fs.db.Update(func(tx *bolt.Tx) error {
+		xtb := tx.Bucket([]byte("xattrs"))
+		if xtb == nil {
+			return errors.New("Missing xattrs bucket")
+		}
+		key := uint64_b(f.inode)
+		xb, err := xtb.CreateBucketIfNotExists(key)
+		if err != nil {
+			return err
+		}
+		return xb.Put([]byte(req.Name), req.Xattr)
+	})
+}
+
+func (f File) Removexattr(req *fuse.RemovexattrRequest, intr fs.Intr) fuse.Error {
+	return f.fs.db.Update(func(tx *bolt.Tx) error {
+		xtb := tx.Bucket([]byte("xattrs"))
+		if xtb == nil {
+			return errors.New("Missing xattrs bucket")
+		}
+		key := uint64_b(f.inode)
+		xb := xtb.Bucket(key)
+		if xb == nil {
+			return nil
+		}
+		return xb.Delete([]byte(req.Name))
+	})
 }
 
 func (f File) LoadSize() uint64 {

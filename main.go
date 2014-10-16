@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 	"os/user"
-//	"runtime"
 
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
@@ -31,8 +30,6 @@ func exists(path string) bool {
 }
 
 func main() {
-	//runtime.GOMAXPROCS(runtime.NumCPU())
-
 	flag.Usage = Usage
 	flag.Parse()
 

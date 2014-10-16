@@ -57,7 +57,30 @@ func NewHandle(file *File, oflags fuse.OpenFlags) (*Handle, error) {
 
 func (h *Handle) Flush(req *fuse.FlushRequest, intr fs.Intr) fuse.Error {
 	log.Println(h.file.inode, "handle", h.id, "flush")
-	return h.fh.Sync()
+	err := h.fh.Sync()
+	if err != nil {
+		return err
+	}
+
+	if h.oflags & syscall.O_RDONLY == 0 {
+		stat, err := h.fh.Stat()
+		if err != nil {
+			return err
+		}
+
+		s := uint64(stat.Size())
+		old := h.file.LoadSize()
+
+		if s != old {
+			log.Println(h.file.inode, "handle", h.id, "resize", s, "from", old)
+
+			err = h.file.SaveSize(s)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (h *Handle) Read(req *fuse.ReadRequest, resp *fuse.ReadResponse, intr fs.Intr) fuse.Error {
@@ -86,7 +109,13 @@ func (h *Handle) Read(req *fuse.ReadRequest, resp *fuse.ReadResponse, intr fs.In
 func (h *Handle) Write(req *fuse.WriteRequest, resp *fuse.WriteResponse, intr fs.Intr) fuse.Error {
 	n, err := h.fh.WriteAt(req.Data, req.Offset)
 	resp.Size = n
-	//log.Println(h.file.inode, "handle", h.id, "writ", strings.Trim(string(req.Data[:n]), "\n"))
+
+	//dn := n
+	//if dn > 30 {
+	//	dn = 30
+	//}
+	//dbg := strings.Replace(string(req.Data[:dn]), "\n", " ", -1)
+	//log.Println(h.file.inode, "handle", h.id, "writ[", dbg, "]", n)
 	return err
 }
 
@@ -105,7 +134,7 @@ func (h *Handle) Release(req *fuse.ReleaseRequest, intr fs.Intr) fuse.Error {
 			old := h.file.LoadSize()
 
 			if s != old {
-				log.Println(h.file.inode, "handle", h.id, "resize", h.file.inode, "size", s, "from", old)
+				log.Println(h.file.inode, "handle", h.id, "resize", s, "from", old)
 
 				err = h.file.SaveSize(s)
 				if err != nil {

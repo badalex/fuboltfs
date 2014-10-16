@@ -64,6 +64,52 @@ func (d Dir) Lookup(name string, intr fs.Intr) (fs.Node, fuse.Error) {
 	return r, nil
 }
 
+func (d Dir) ReadDir(intr fs.Intr) ([]fuse.Dirent, fuse.Error) {
+	log.Println(d.inode, "readdir")
+
+	list := []fuse.Dirent{}
+
+	err := d.fs.db.View(func(tx *bolt.Tx) error {
+		fsizes := tx.Bucket([]byte("filesize"))
+		if fsizes == nil {
+			return errors.New("Missing filesize bucket")
+		}
+		kids := tx.Bucket([]byte("kids"))
+		if kids == nil {
+			return errors.New("Missing kids bucket")
+		}
+		dkids := kids.Bucket(uint64_b(d.inode))
+		if dkids == nil {
+			return errors.New("Missing directory kids bucket")
+		}
+		dkids.ForEach(func(k, v []byte) error {
+			name := string(k)
+			inode := b_uint64(v)
+
+			fsize := fsizes.Get(v)
+			typ := fuse.DT_Dir
+			if fsize != nil {
+				typ = fuse.DT_File
+			}
+
+			log.Println(inode, "dirent size", b_uint64(fsize))
+			list = append(list, fuse.Dirent{
+				Inode: inode,
+				Name: name,
+				Type: typ,
+			})
+			return nil
+		})
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return list, nil
+}
+
+
 func (d Dir) Rename(req *fuse.RenameRequest, newDir fs.Node, intr fs.Intr) fuse.Error {
 	log.Println(d.inode, "rename")
 
@@ -181,51 +227,6 @@ func (d Dir) Mkdir(req *fuse.MkdirRequest, intr fs.Intr) (fs.Node, fuse.Error) {
 	return child, err
 }
 
-func (d Dir) ReadDir(intr fs.Intr) ([]fuse.Dirent, fuse.Error) {
-	log.Println(d.inode, "readdir")
-
-	list := []fuse.Dirent{}
-
-	err := d.fs.db.View(func(tx *bolt.Tx) error {
-		fsizes := tx.Bucket([]byte("filesize"))
-		if fsizes == nil {
-			return errors.New("Missing filesize bucket")
-		}
-		kids := tx.Bucket([]byte("kids"))
-		if kids == nil {
-			return errors.New("Missing kids bucket")
-		}
-		dkids := kids.Bucket(uint64_b(d.inode))
-		if dkids == nil {
-			return errors.New("Missing directory kids bucket")
-		}
-		dkids.ForEach(func(k, v []byte) error {
-			name := string(k)
-			inode := b_uint64(v)
-
-			fsize := fsizes.Get(v)
-			typ := fuse.DT_Dir
-			if fsize != nil {
-				typ = fuse.DT_File
-			}
-
-			log.Println(inode, "dirent size", b_uint64(fsize))
-			list = append(list, fuse.Dirent{
-				Inode: inode,
-				Name: name,
-				Type: typ,
-			})
-			return nil
-		})
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return list, nil
-}
-
 
 func (d Dir) Create(req *fuse.CreateRequest, resp *fuse.CreateResponse, intr fs.Intr) (fs.Node, fs.Handle, fuse.Error) {
 	log.Println(d.inode, "create")
@@ -279,3 +280,25 @@ func (d Dir) Create(req *fuse.CreateRequest, resp *fuse.CreateResponse, intr fs.
 	}
 	return child, handle, err
 }
+
+func (d Dir) Listxattr(req *fuse.ListxattrRequest, resp *fuse.ListxattrResponse, intr fs.Intr) fuse.Error {
+	f := File{inode: d.inode, fs: d.fs}
+	return f.Listxattr(req, resp, intr)
+}
+
+func (d Dir) Getxattr(req *fuse.GetxattrRequest, resp *fuse.GetxattrResponse, intr fs.Intr) fuse.Error {
+	f := File{inode: d.inode, fs: d.fs}
+	return f.Getxattr(req, resp, intr)
+}
+
+func (d Dir) Setxattr(req *fuse.SetxattrRequest, intr fs.Intr) fuse.Error {
+	f := File{inode: d.inode, fs: d.fs}
+	return f.Setxattr(req, intr)
+}
+
+func (d Dir) Removexattr(req *fuse.RemovexattrRequest, intr fs.Intr) fuse.Error {
+	f := File{inode: d.inode, fs: d.fs}
+	return f.Removexattr(req, intr)
+}
+
+

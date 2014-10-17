@@ -85,5 +85,7 @@ func main() {
 	if err := c.MountError; err != nil {
 		log.Fatal(err)
 	}
+
+	log.Println("shut down nicely")
 }
 

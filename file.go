@@ -8,6 +8,7 @@ import (
 	"log"
 	"strconv"
 	"syscall"
+	"time"
 )
 
 var _ = log.Println
@@ -22,20 +23,28 @@ func (f File) Attr() fuse.Attr {
 
 	fpath := f.fs.storagepath + "/files/" + strconv.FormatUint(f.inode, 10)
 
-	var s uint64
+	attr := fuse.Attr{
+		Inode: f.inode,
+		Mode: 0644,
+		Nlink: 1,
+	}
 
 	stat := syscall.Stat_t{}
 	err := syscall.Stat(fpath, &stat)
 	if err == nil {
-		s = uint64(stat.Size)
+		log.Printf("%+v\n", stat)
+
+		attr.Size = uint64(stat.Size)
+		attr.Blocks = uint64(stat.Blocks)
+
+		attr.Atime = time.Unix(stat.Atimespec.Unix())
+		attr.Mtime = time.Unix(stat.Mtimespec.Unix())
+		attr.Ctime = time.Unix(stat.Ctimespec.Unix())
+
+		attr.Nlink = uint32(stat.Nlink)
 	}
 
-	return fuse.Attr{
-		Inode: f.inode,
-		Mode: 0644,
-		Size: s, //f.LoadSize(),
-		Nlink: 1,
-	}
+	return attr
 }
 
 func (f File) Fsync(req *fuse.FsyncRequest, intr fs.Intr) fuse.Error {

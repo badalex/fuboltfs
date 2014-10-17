@@ -68,7 +68,12 @@ func main() {
 	}
 	defer myfs.CloseBolt()
 
-	log.Println("fs ready")
+	err = myfs.SpawnAdminConsole()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Println("fs ready (admin console: nc localhost 2000)")
 
 	server := fs.Server{
 		FS: myfs,

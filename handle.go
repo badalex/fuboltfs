@@ -50,13 +50,13 @@ func NewHandle(file *File, oflags fuse.OpenFlags) (*Handle, error) {
 		return nil, err
 	}
 
-	log.Println(h.file.inode, "handle", h.id, "oflags", oflags)
+	//log.Println(h.file.inode, "handle", h.id, "oflags", oflags)
 
 	return &h, nil
 }
 
 func (h *Handle) Flush(req *fuse.FlushRequest, intr fs.Intr) fuse.Error {
-	log.Println(h.file.inode, "handle", h.id, "flush")
+	//log.Println(h.file.inode, "handle", h.id, "flush")
 	err := h.fh.Sync()
 	if err != nil {
 		return err
@@ -72,7 +72,7 @@ func (h *Handle) Flush(req *fuse.FlushRequest, intr fs.Intr) fuse.Error {
 		old := h.file.LoadSize()
 
 		if s != old {
-			log.Println(h.file.inode, "handle", h.id, "resize", s, "from", old)
+			//log.Println(h.file.inode, "handle", h.id, "resize", s, "from", old)
 
 			err = h.file.SaveSize(s)
 			if err != nil {
@@ -120,7 +120,7 @@ func (h *Handle) Write(req *fuse.WriteRequest, resp *fuse.WriteResponse, intr fs
 }
 
 func (h *Handle) Release(req *fuse.ReleaseRequest, intr fs.Intr) fuse.Error {
-	log.Println(h.file.inode, "handle", h.id, "released")
+	//log.Println(h.file.inode, "handle", h.id, "released")
 
 	if h.fh != nil {
 		if h.oflags & syscall.O_RDONLY == 0 {
@@ -134,7 +134,7 @@ func (h *Handle) Release(req *fuse.ReleaseRequest, intr fs.Intr) fuse.Error {
 			old := h.file.LoadSize()
 
 			if s != old {
-				log.Println(h.file.inode, "handle", h.id, "resize", s, "from", old)
+				//log.Println(h.file.inode, "handle", h.id, "resize", s, "from", old)
 
 				err = h.file.SaveSize(s)
 				if err != nil {

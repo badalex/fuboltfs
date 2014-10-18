@@ -2,39 +2,17 @@ package main
 
 import (
 	"bazil.org/fuse"
-	"log"
-	"strconv"
 	"syscall"
 	"time"
 )
 
-var _ = log.Println
+func bazil_attr_from_stat_t(stat *syscall.Stat_t, attr *fuse.Attr) {
+	attr.Size = uint64(stat.Size)
+	attr.Blocks = uint64(stat.Blocks)
 
-func (f File) Attr() fuse.Attr {
-	log.Println(f.inode, "fattr")
+	attr.Atime = time.Unix(stat.Atimespec.Unix())
+	attr.Mtime = time.Unix(stat.Mtimespec.Unix())
+	attr.Ctime = time.Unix(stat.Ctimespec.Unix())
 
-	fpath := f.fs.storagepath + "/files/" + strconv.FormatUint(f.inode, 10)
-
-	attr := fuse.Attr{
-		Inode: f.inode,
-		Mode: 0644,
-		Nlink: 1,
-	}
-
-	stat := syscall.Stat_t{}
-	err := syscall.Stat(fpath, &stat)
-	if err == nil {
-		log.Printf("%+v\n", stat)
-
-		attr.Size = uint64(stat.Size)
-		attr.Blocks = uint64(stat.Blocks)
-
-		attr.Atime = time.Unix(stat.Atimespec.Unix())
-		attr.Mtime = time.Unix(stat.Mtimespec.Unix())
-		attr.Ctime = time.Unix(stat.Ctimespec.Unix())
-
-		attr.Nlink = uint32(stat.Nlink)
-	}
-
-	return attr
+	attr.Nlink = uint32(stat.Nlink)
 }

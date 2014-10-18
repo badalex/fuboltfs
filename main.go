@@ -37,12 +37,6 @@ func main() {
 		Usage()
 		os.Exit(2)
 	}
-	mountpoint := flag.Arg(0)
-
-	c, err := fuse.Mount(mountpoint)
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	you, err := user.Current()
 	if err != nil {
@@ -68,12 +62,22 @@ func main() {
 	}
 	defer myfs.CloseBolt()
 
+	myfs.DatabaseIDPrompt()
+
 	err = myfs.SpawnAdminConsole()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Println("fs ready (admin console: nc localhost 2000)")
+
+	mountpoint := flag.Arg(0)
+
+	c, err := fuse.Mount(mountpoint)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Println("fs ready, dbid", myfs.dbid, "(admin console: nc localhost 2000)")
 
 	server := fs.Server{
 		FS: myfs,
@@ -86,6 +90,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Println("shut down nicely")
+	log.Println("fs shut down nicely")
 }
 

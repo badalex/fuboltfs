@@ -6,6 +6,8 @@ import (
 	"github.com/boltdb/bolt"
 	"errors"
 	"log"
+	"strconv"
+	"syscall"
 )
 
 var _ = log.Println
@@ -15,8 +17,29 @@ type File struct {
 	fs *FS
 }
 
+func (f File) Attr() fuse.Attr {
+	//log.Println(f.inode, "fattr")
+
+	fpath := f.fs.storagepath + "/files/" + strconv.FormatUint(f.inode, 10)
+
+	attr := fuse.Attr{
+		Inode: f.inode,
+		Mode: 0644,
+		Nlink: 1,
+	}
+
+	stat := syscall.Stat_t{}
+	err := syscall.Stat(fpath, &stat)
+	if err == nil {
+		//log.Printf("%+v\n", stat)
+		bazil_attr_from_stat_t(&stat, &attr) // see platform specific file_attr_*.go
+	}
+
+	return attr
+}
+
 func (f File) Fsync(req *fuse.FsyncRequest, intr fs.Intr) fuse.Error {
-	log.Println(f.inode, "sync")
+	//log.Println(f.inode, "sync")
 
 	// TODO: implement this when bazil.org/fuse moves it from Node to Handle
 	// this data structure does not have the open filehandle so I don't know
@@ -113,7 +136,7 @@ func (f File) LoadSize() uint64 {
 }
 
 func (f File) Open(req *fuse.OpenRequest, resp *fuse.OpenResponse, intr fs.Intr) (fs.Handle, fuse.Error) {
-	log.Println(f.inode, "open")
+	//log.Println(f.inode, "open")
 	return NewHandle(&f, req.Flags)
 }
 

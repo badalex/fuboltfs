@@ -8,9 +8,11 @@ import (
 	"syscall"
 	"github.com/boltdb/bolt"
 	"log"
+	"fmt"
 )
 
 var _ = log.Printf
+var _ = fmt.Println
 
 type Dir struct {
 	inode uint64
@@ -18,12 +20,12 @@ type Dir struct {
 }
 
 func (d Dir) Attr() fuse.Attr {
-	log.Println(d.inode, "dattr")
+	//(d.inode, "dattr")
 	return fuse.Attr{Inode: d.inode, Mode: os.ModeDir | 0555}
 }
 
 func (d Dir) Lookup(name string, intr fs.Intr) (fs.Node, fuse.Error) {
-	log.Println(d.inode, "lookup", name)
+	//log.Println(d.inode, "lookup", name)
 
 	var r fs.Node
 
@@ -49,7 +51,7 @@ func (d Dir) Lookup(name string, intr fs.Intr) (fs.Node, fuse.Error) {
 			return fuse.ENOENT
 		}
 		fsizev := fsizes.Get(match)
-		log.Println(inode, "lookup size", b_uint64(fsizev))
+		//log.Println(inode, "lookup size", b_uint64(fsizev))
 		if fsizev == nil {
 			r = Dir{inode: inode, fs: d.fs}
 		} else {
@@ -65,7 +67,7 @@ func (d Dir) Lookup(name string, intr fs.Intr) (fs.Node, fuse.Error) {
 }
 
 func (d Dir) ReadDir(intr fs.Intr) ([]fuse.Dirent, fuse.Error) {
-	log.Println(d.inode, "readdir")
+	//log.Println(d.inode, "readdir")
 
 	list := []fuse.Dirent{}
 
@@ -92,7 +94,7 @@ func (d Dir) ReadDir(intr fs.Intr) ([]fuse.Dirent, fuse.Error) {
 				typ = fuse.DT_File
 			}
 
-			log.Println(inode, "dirent size", b_uint64(fsize))
+			//log.Println(inode, "dirent size", b_uint64(fsize))
 			list = append(list, fuse.Dirent{
 				Inode: inode,
 				Name: name,
@@ -111,7 +113,7 @@ func (d Dir) ReadDir(intr fs.Intr) ([]fuse.Dirent, fuse.Error) {
 
 
 func (d Dir) Rename(req *fuse.RenameRequest, newDir fs.Node, intr fs.Intr) fuse.Error {
-	log.Println(d.inode, "rename")
+	//log.Println(d.inode, "rename")
 
 	if req.NewName == req.OldName && newDir.Attr().Inode == d.inode {
 		// seems to be a noop
@@ -132,8 +134,6 @@ func (d Dir) Rename(req *fuse.RenameRequest, newDir fs.Node, intr fs.Intr) fuse.
 		if exists == nil {
 			return fuse.Errno(syscall.ENOENT)
 		}
-
-		inode := b_uint64(exists)
 
 		// put it into the new folder before we remove it from the old one
 		new_dir_inode := newDir.Attr().Inode
@@ -160,14 +160,15 @@ func (d Dir) Rename(req *fuse.RenameRequest, newDir fs.Node, intr fs.Intr) fuse.
 			return err
 		}
 
-		log.Println(inode, "moved from", d.inode, "to", new_dir_inode, "name from", req.OldName, "to", req.NewName)
+		//inode := b_uint64(exists)
+		//log.Println(inode, "moved from", d.inode, "to", new_dir_inode, "name from", req.OldName, "to", req.NewName)
 
 		return nil
 	})
 }
 
 func (d Dir) Remove(req *fuse.RemoveRequest, intr fs.Intr) fuse.Error {
-	log.Println(d.inode, "remove", req.Name)
+	//log.Println(d.inode, "remove", req.Name)
 
 	return d.fs.db.Update(func(tx *bolt.Tx) error {
 		kids := tx.Bucket([]byte("kids"))
@@ -183,14 +184,14 @@ func (d Dir) Remove(req *fuse.RemoveRequest, intr fs.Intr) fuse.Error {
 		if exists == nil {
 			return fuse.Errno(syscall.ENOENT)
 		}
-		inode := b_uint64(exists)
-		log.Println(inode, "removed")
+		//inode := b_uint64(exists)
+		//log.Println(inode, "removed")
 		return dkids.Delete(key)
 	})
 }
 
 func (d Dir) Mkdir(req *fuse.MkdirRequest, intr fs.Intr) (fs.Node, fuse.Error) {
-	log.Println(d.inode, "mkdir", req.Name)
+	//log.Println(d.inode, "mkdir", req.Name)
 
 	var child fs.Node
 	err := d.fs.db.Update(func(tx *bolt.Tx) error {
@@ -214,8 +215,20 @@ func (d Dir) Mkdir(req *fuse.MkdirRequest, intr fs.Intr) (fs.Node, fuse.Error) {
 		}
 
 		val := uint64_b(inode)
-		dkids.Put(key, val)
-		kids.CreateBucket(val)
+		err = dkids.Put(key, val)
+		if err != nil {
+			return err
+		}
+		_, err = kids.CreateBucket(val)
+		if err != nil {
+			return err
+		}
+
+		txn, err := d.fs.NewTx(tx, TX_MKDIR, d.inode, key, 0, nil)
+		if err != nil {
+			return err
+		}
+		_ = txn
 
 		child = &Dir{inode: inode, fs: d.fs}
 		return nil
@@ -229,7 +242,7 @@ func (d Dir) Mkdir(req *fuse.MkdirRequest, intr fs.Intr) (fs.Node, fuse.Error) {
 
 
 func (d Dir) Create(req *fuse.CreateRequest, resp *fuse.CreateResponse, intr fs.Intr) (fs.Node, fs.Handle, fuse.Error) {
-	log.Println(d.inode, "create")
+	//log.Println(d.inode, "create")
 
 	//log.Println("create request, flags", req.Flags, "mode", req.Mode)
 
@@ -263,7 +276,7 @@ func (d Dir) Create(req *fuse.CreateRequest, resp *fuse.CreateResponse, intr fs.
 		dkids.Put(key, val)
 		fsizes.Put(val, uint64_b(0))
 
-		log.Println(inode, "created")
+		//log.Println(inode, "created")
 
 		newfile := File{inode: inode, fs: d.fs}
 		child = &newfile
